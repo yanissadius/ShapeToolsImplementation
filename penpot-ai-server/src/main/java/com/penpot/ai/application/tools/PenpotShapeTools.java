@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.*;
 import org.springframework.stereotype.Component;
+import java.util.Locale;
 
 /**
  * Tools pour la création de formes graphiques dans Penpot.
@@ -132,6 +133,70 @@ public class PenpotShapeTools {
         return toolExecutor.createShape(buildStarCode(x, y, width, height, points, innerRadius, fillColor, name), "star");
     }
 
+    // Tools pour la création d'un triangle (isoscele , carré , equilateral)
+    
+    @Tool(description = """
+        Create a triangle shape in Penpot.
+
+        CRITICAL: Returns a UUID that you MUST save for later operations!
+
+        Triangle types:
+        - equilateral : apex at top-center, equal sides (default)
+        - right       : right angle at bottom-left
+        - isosceles   : apex at top-center, base wider than height
+
+        Examples:
+        - "Create a red equilateral triangle 100x100"
+        - "Add a right triangle at position (50, 50)"
+        """)
+    public String createTriangle(
+        @ToolParam(description = "X position in pixels") Integer x,
+        @ToolParam(description = "Y position in pixels") Integer y,
+        @ToolParam(description = "Width in pixels") Integer width,
+        @ToolParam(description = "Height in pixels") Integer height,
+        @ToolParam(description = "Triangle type: equilateral, right, isosceles (default: equilateral)", required = false) String type,
+        @ToolParam(description = "Fill color in hex format (#RRGGBB)", required = false) String fillColor,
+        @ToolParam(description = "Optional name for the triangle", required = false) String name
+    ) {
+        log.info("Tool called: createTriangle (x={}, y={}, w={}, h={}, type={})",
+                x, y, width, height, type);
+        return toolExecutor.createShape(
+                buildTriangleCode(x, y, width, height, type, fillColor, name),
+                "triangle"
+        );
+    }
+    // Tool pour la création d'un Boolean (union , intersection , difference entre shapes )
+    @Tool(description = """
+        Combine multiple existing shapes using a boolean operation in Penpot.
+
+        CRITICAL: You must provide the UUIDs of existing shapes (returned by previous tool calls).
+                  Never invent fake IDs like "shape1", "rect1", etc.
+
+        Boolean operations:
+        - union      : merges all shapes into one combined shape
+        - subtract   : removes the area of subsequent shapes from the first shape
+        - intersect  : keeps only the overlapping area between shapes
+        - exclude    : keeps non-overlapping areas, removes overlap
+
+        Requires at least 2 shape IDs.
+
+        Example usage:
+        - "Combine these two circles into one" → union
+        - "Cut a hole in the rectangle using the circle" → subtract
+        - "Keep only the overlapping part" → intersect
+
+        Returns the UUID of the resulting boolean shape.
+        """)
+    public String createBoolean(
+        @ToolParam(description = "Boolean operation type: union, subtract, intersect, or exclude") String boolType,
+        @ToolParam(description = "Comma-separated UUIDs of the shapes to combine (minimum 2), e.g: 'uuid1,uuid2,uuid3'") String shapeIds,
+        @ToolParam(description = "Optional name for the resulting boolean shape", required = false) String name
+    ) {
+        log.info("Tool called: createBoolean (type={}, shapeIds={})", boolType, shapeIds);
+        return toolExecutor.createShape(buildBooleanCode(boolType, shapeIds, name), "boolean");
+    }
+    
+
     // ==================== CODE GENERATION METHODS ====================
 
     private String buildRectangleCode(Integer x, Integer y, Integer width, Integer height, String fillColor, String name) {
@@ -222,5 +287,117 @@ public class PenpotShapeTools {
         }
         sb.append(" Z");
         return sb.toString();
+    }
+
+    private String buildTriangleCode(
+            Integer x, Integer y, Integer width, Integer height,
+            String type, String fillColor, String name) {
+
+        String pathData = generateTrianglePath(width, height, type);
+        String color = (fillColor != null && !fillColor.isBlank()) ? fillColor : "#CCCCCC";
+
+        // SVG embarqué dans le JS — même pattern que buildStarCode
+        String svg = String.format(
+                "<svg width='%d' height='%d' viewBox='0 0 %d %d' xmlns='http://www.w3.org/2000/svg'>"
+                + "<path d='%s' fill='%s'/></svg>",
+                width, height, width, height, pathData, color
+        );
+
+        StringBuilder code = new StringBuilder();
+        code.append(String.format("const svg = `%s`;\n", svg));
+        code.append("const group = penpot.createShapeFromSvg(svg);\n");
+        code.append("if (!group) throw new Error('Failed to create triangle from SVG');\n");
+        code.append(String.format("group.x = %d;\n", x));
+        code.append(String.format("group.y = %d;\n", y));
+        if (name != null && !name.isBlank()) {
+            code.append(String.format("group.name = '%s';\n", PenpotJsSnippets.escapeJsString(name)));
+        }
+        code.append("return group.id;\n");
+        return code.toString();
+    }
+
+    /**
+     * Génère le SVG path selon le type de triangle.
+     *
+     * equilateral 
+     * right     
+     * isosceles   
+     *               
+     */
+    private String generateTrianglePath(int width, int height, String type) {
+    double cx = width / 2.0;
+    if (type == null) type = "equilateral";
+
+    return switch (type.toLowerCase().trim()) {
+        case "right" ->
+            String.format("M 0,0 L %d,%d L 0,%d Z", width, height, height);
+
+        case "isosceles" ->
+            String.format(Locale.US, "M %.1f,0 L %d,%d L 0,%d Z", cx, width, height, height);
+
+        default -> // equilateral
+            String.format(Locale.US, "M %.1f,0 L %d,%d L 0,%d Z", cx, width, height, height);
+    };
+}
+
+     /**
+     * Génère le JS pour une opération booléenne Penpot.
+     *
+     */
+    private String buildBooleanCode(String boolType, String shapeIds, String name) {
+        String resolvedType = resolveBooleanType(boolType);
+        String[] ids = shapeIds.split(",");
+
+        StringBuilder code = new StringBuilder();
+
+        // Récupération des shapes existantes depuis leurs UUIDs
+        code.append("const shapes = [];\n");
+        for (String id : ids) {
+            String trimmedId = id.trim();
+            code.append(String.format(
+                "const shape_%s = penpot.currentPage.getShapeById('%s');\n",
+                trimmedId.replace("-", "_"), trimmedId
+            ));
+            code.append(String.format(
+                "if (!shape_%s) throw new Error('Shape not found: %s');\n",
+                trimmedId.replace("-", "_"), trimmedId
+            ));
+            code.append(String.format("shapes.push(shape_%s);\n",
+                trimmedId.replace("-", "_")));
+        }
+
+        // Validation du nombre de shapes
+        code.append("if (shapes.length < 2) throw new Error('createBoolean requires at least 2 shapes');\n");
+
+        // Opération booléenne
+        code.append(String.format(
+            "const result = penpot.createBoolean('%s', shapes);\n", resolvedType
+        ));
+        code.append("if (!result) throw new Error('Boolean operation failed');\n");
+
+        // Nom optionnel
+        if (name != null && !name.isBlank()) {
+            code.append(String.format("result.name = '%s';\n",
+                PenpotJsSnippets.escapeJsString(name)));
+        }
+
+        code.append("return result.id;\n");
+        return code.toString();
+    }
+     /**
+     * Mappe le type booléen vers la valeur attendue par l'API Penpot.
+     *
+     * Penpot API accepte : 'union' | 'difference' | 'exclude' | 'intersection'
+     * On accepte en plus : 'subtract' → 'difference', 'intersect' → 'intersection'
+     */
+    private String resolveBooleanType(String boolType) {
+        if (boolType == null) return "union"; // fallback
+        return switch (boolType.toLowerCase().trim()) {
+            case "subtract", "difference" -> "difference";
+            case "intersect", "intersection" -> "intersection";
+            case "exclude"                 -> "exclude";
+            case "union"                   -> "union";
+            default                        -> "union"; 
+        };
     }
 }
