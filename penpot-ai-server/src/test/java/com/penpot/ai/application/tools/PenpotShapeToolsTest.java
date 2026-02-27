@@ -82,6 +82,17 @@ class PenpotShapeToolsTest {
                 .doesNotContain("fills")
                 .doesNotContain("rect.name");
         }
+    @Test
+    @DisplayName("Rectangle crée avec le nom renseigné")
+    void shouldIncludeName_WhencreateRectangle_withName() {
+        //GIVEN
+        ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+        //WHEN
+        penpotShapeTools.createRectangle(0, 0, 100, 100, null, "mon-rect");
+        //THEN
+        verify(toolExecutor).createShape(code.capture(), eq("rectangle"));
+        assertThat(code.getValue()).contains("rect.name = 'mon-rect'");
+}
     }
 
     // =========================================================================
@@ -126,6 +137,20 @@ class PenpotShapeToolsTest {
                 .doesNotContain("fills")
                 .doesNotContain("ellipse.name");
         }
+        @Test
+        @DisplayName("")
+        void shouldOmitName_WhencreateBoard_withNullName() {
+            //Given
+            ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+            //When
+            penpotShapeTools.createBoard(1080, 1080, null, "#FFFFFF");
+            //Then
+            verify(toolExecutor).createShape(code.capture(), eq("board"));
+            assertThat(code.getValue())
+                .doesNotContain("board.name")
+                .contains("fillColor: '#FFFFFF'");
+        }
+
     }
 
     // =========================================================================
@@ -237,6 +262,19 @@ class PenpotShapeToolsTest {
             verify(toolExecutor).createShape(code.capture(), eq("star"));
             assertThat(code.getValue()).contains("fill='#CCCCCC'");
         }
+        @Test
+        @DisplayName("")
+        void shouldUseProvidedValues_WhencreateStar_withAllParams() {
+            //Given
+            ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+            //When
+            penpotShapeTools.createStar(0, 0, 100, 100, 6, 50, "#FF0000", "etoile");
+            //Then
+            verify(toolExecutor).createShape(code.capture(), eq("star"));
+            assertThat(code.getValue())
+                .contains("fill='#FF0000'")
+                .contains("group.name = 'etoile'");
+}
     }
 
     // =========================================================================
@@ -293,7 +331,35 @@ class PenpotShapeToolsTest {
             verify(toolExecutor).createShape(code.capture(), eq("triangle"));
             assertThat(code.getValue()).contains("M 50.0,0");
         }
+
+        @Test
+        @DisplayName("Isosceles : apex centré comme equilateral")
+        void shouldGenerateIsoscelesPath() {
+        // Given
+            ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+
+        // When
+             penpotShapeTools.createTriangle(0, 0, 100, 60, "isosceles", null, null);
+
+        // Then
+            verify(toolExecutor).createShape(code.capture(), eq("triangle"));
+            assertThat(code.getValue()).contains("M 50.0,0");
+}
+    @Test
+    @DisplayName("createTriangle : avec nom, group.name présent dans le JS")
+    void createTriangle_shouldIncludeNameWhenProvided() {
+    // Given
+        ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+
+    // When
+        penpotShapeTools.createTriangle(0, 0, 100, 100, "equilateral", null, "mon-triangle");
+
+    // Then
+        verify(toolExecutor).createShape(code.capture(), eq("triangle"));
+        assertThat(code.getValue()).contains("group.name = 'mon-triangle'");
+}
     }
+
 
     // =========================================================================
     // createBoolean
@@ -351,5 +417,93 @@ class PenpotShapeToolsTest {
             verify(toolExecutor).createShape(code.capture(), eq("boolean"));
             assertThat(code.getValue()).contains("createBoolean('union'");
         }
+
+        @Test
+        @DisplayName("difference, intersection, exclude : mappés correctement")
+        void shouldMapAllBooleanTypes() {
+        // difference
+
+            //when
+            penpotShapeTools.createBoolean("difference", SHAPE_ID_1 + "," + SHAPE_ID_2, null);
+            ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+            // then
+            verify(toolExecutor).createShape(code.capture(), eq("boolean"));
+            assertThat(code.getValue()).contains("createBoolean('difference'");
+
+            reset(toolExecutor);
+            when(toolExecutor.createShape(anyString(), anyString())).thenReturn(FAKE_UUID);
+
+    // intersection
+            penpotShapeTools.createBoolean("intersection", SHAPE_ID_1 + "," + SHAPE_ID_2, null);
+            code = ArgumentCaptor.forClass(String.class);
+            verify(toolExecutor).createShape(code.capture(), eq("boolean"));
+            assertThat(code.getValue()).contains("createBoolean('intersection'");
+
+            reset(toolExecutor);
+            when(toolExecutor.createShape(anyString(), anyString())).thenReturn(FAKE_UUID);
+
+    // exclude
+            penpotShapeTools.createBoolean("exclude", SHAPE_ID_1 + "," + SHAPE_ID_2, null);
+            code = ArgumentCaptor.forClass(String.class);
+            verify(toolExecutor).createShape(code.capture(), eq("boolean"));
+            assertThat(code.getValue()).contains("createBoolean('exclude'");
+}
+    @Test
+    @DisplayName("Sans nom : pas de board.name dans le JS")
+    void shouldOmitNameWhenNull() {
+    // Given
+        ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+
+    // When
+        penpotShapeTools.createBoard(1080, 1080, null, null);
+
+    // Then
+        verify(toolExecutor).createShape(code.capture(), eq("board"));
+        assertThat(code.getValue()).doesNotContain("board.name");
+}
+
+    @Test
+    void shouldFallbackToUnion_WhencreateBoolean_withNullType() {
+        //Given
+        ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+        //When
+        penpotShapeTools.createBoolean(null, SHAPE_ID_1 + "," + SHAPE_ID_2, null);
+        //Then
+        verify(toolExecutor).createShape(code.capture(), eq("boolean"));
+        assertThat(code.getValue()).contains("createBoolean('union'");
+}
+
+    @Test
+    void shouldMapToDifference_WhencreateBoolean_withDifferenceType() {
+        //Given
+        ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+        //When
+        penpotShapeTools.createBoolean("difference", SHAPE_ID_1 + "," + SHAPE_ID_2, null);
+        //Then
+        verify(toolExecutor).createShape(code.capture(), eq("boolean"));
+        assertThat(code.getValue()).contains("createBoolean('difference'");
+}
+
+    @Test
+    void shouldMapToIntersection_WhencreateBoolean_withIntersectType() {
+        //Given
+        ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+        //When
+        penpotShapeTools.createBoolean("intersect", SHAPE_ID_1 + "," + SHAPE_ID_2, null);
+        //Then
+        verify(toolExecutor).createShape(code.capture(), eq("boolean"));
+        assertThat(code.getValue()).contains("createBoolean('intersection'");
+}
+
+    @Test
+    void shouldMapToExclude_WhencreateBoolean_withExcludeType() {
+        //Given
+        ArgumentCaptor<String> code = ArgumentCaptor.forClass(String.class);
+        //When
+        penpotShapeTools.createBoolean("exclude", SHAPE_ID_1 + "," + SHAPE_ID_2, null);
+        //Then
+        verify(toolExecutor).createShape(code.capture(), eq("boolean"));
+        assertThat(code.getValue()).contains("createBoolean('exclude'");
+}
     }
 }

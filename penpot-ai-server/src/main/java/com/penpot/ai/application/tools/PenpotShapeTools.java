@@ -47,6 +47,21 @@ public class PenpotShapeTools {
         return toolExecutor.createShape(buildRectangleCode(x, y, width, height, fillColor, name), "rectangle");
     }
 
+    /**
+     * Crée un rectangle sur la page courante de Penpot.
+     *
+     * <p>Retourne l'UUID du shape créé — il est CRUCIAL de conserver cet ID
+     * pour toute opération ultérieure (déplacement, transformation, boolean, ...).</p>
+     *
+     * @param x abscisse (pixels) de la position
+     * @param y ordonnée (pixels) de la position
+     * @param width largeur en pixels
+     * @param height hauteur en pixels
+     * @param fillColor couleur de remplissage au format hex (#RRGGBB), facultatif
+     * @param name nom optionnel du rectangle
+     * @return l'UUID du rectangle créé
+     */
+
     @Tool(description = """
         Create an ellipse (circle or oval) shape in Penpot.
 
@@ -65,6 +80,21 @@ public class PenpotShapeTools {
         log.info("Tool called: createEllipse (x={}, y={}, w={}, h={})", x, y, width, height);
         return toolExecutor.createShape(buildEllipseCode(x, y, width, height, fillColor, name), "ellipse");
     }
+
+    /**
+     * Crée une ellipse (ou un cercle si width==height) sur la page courante.
+     *
+     * <p>Retourne l'UUID de l'ellipse — conserver cet ID pour les opérations
+     * suivantes.</p>
+     *
+     * @param x abscisse (pixels) du centre
+     * @param y ordonnée (pixels) du centre
+     * @param width largeur en pixels
+     * @param height hauteur en pixels
+     * @param fillColor couleur de remplissage en hex (facultatif)
+     * @param name nom optionnel de l'ellipse
+     * @return l'UUID de l'ellipse créée
+     */
 
     @Tool(description = """
         Create a text element in Penpot.
@@ -90,6 +120,21 @@ public class PenpotShapeTools {
         );
     }
 
+    /**
+     * Crée un élément de texte sur la page courante.
+     *
+     * <p>Retourne l'UUID du texte créé — conservez-le pour référence future.</p>
+     *
+     * @param content contenu du texte
+     * @param x position X en pixels
+     * @param y position Y en pixels
+     * @param fontSize taille de police en pixels (peut être null pour la valeur par défaut)
+     * @param fontWeight poids de la police ("normal" ou "bold"), facultatif
+     * @param fillColor couleur du texte en hex (facultatif)
+     * @param name nom optionnel de l'élément texte
+     * @return l'UUID de l'élément texte créé
+     */
+
     @Tool(description = """
         Create a board (artboard/canvas) in Penpot.
         Use this as a container for design elements.
@@ -112,6 +157,16 @@ public class PenpotShapeTools {
         return toolExecutor.createShape(buildBoardCode(width, height, name, backgroundColor), "board");
     }
 
+    /**
+     * Crée un board (artboard/canvas) et retourne son UUID.
+     *
+     * @param width largeur du board en pixels
+     * @param height hauteur du board en pixels
+     * @param name nom du board
+     * @param backgroundColor couleur de fond en hex (facultatif)
+     * @return l'UUID du board créé
+     */
+
     @Tool(description = """
         Create a star shape in Penpot.
 
@@ -132,6 +187,24 @@ public class PenpotShapeTools {
         log.info("Tool called: createStar (x={}, y={}, w={}, h={}, points={})", x, y, width, height, points);
         return toolExecutor.createShape(buildStarCode(x, y, width, height, points, innerRadius, fillColor, name), "star");
     }
+
+    /**
+     * Crée une étoile (SVG) et la place à la position donnée.
+     *
+     * <p>Si le nombre de points n'est pas renseigné, la valeur par défaut est 5.
+     * L'innerRadius est exprimé en pourcentage (0-100) et contrôle le rayon
+     * intérieur de l'étoile.</p>
+     *
+     * @param x position X en pixels
+     * @param y position Y en pixels
+     * @param width largeur de l'étoile (et du SVG) en pixels
+     * @param height hauteur de l'étoile (et du SVG) en pixels
+     * @param points nombre de branches (facultatif)
+     * @param innerRadius rayon intérieur en pourcentage 0-100 (facultatif)
+     * @param fillColor couleur de remplissage en hex (facultatif)
+     * @param name nom optionnel de l'étoile
+     * @return l'UUID de l'étoile créée
+     */
 
     // Tools pour la création d'un triangle (isoscele , carré , equilateral)
     
@@ -165,6 +238,21 @@ public class PenpotShapeTools {
                 "triangle"
         );
     }
+
+        /**
+         * Crée un triangle (différents types supportés) et retourne son UUID.
+         *
+         * <p>Types supportés: "equilateral" (par défaut), "right", "isosceles".</p>
+         *
+         * @param x position X en pixels
+         * @param y position Y en pixels
+         * @param width largeur en pixels
+         * @param height hauteur en pixels
+         * @param type type de triangle (facultatif)
+         * @param fillColor couleur de remplissage en hex (facultatif)
+         * @param name nom optionnel du triangle
+         * @return l'UUID du triangle créé
+         */
     // Tool pour la création d'un Boolean (union , intersection , difference entre shapes )
     @Tool(description = """
         Combine multiple existing shapes using a boolean operation in Penpot.
@@ -195,6 +283,19 @@ public class PenpotShapeTools {
         log.info("Tool called: createBoolean (type={}, shapeIds={})", boolType, shapeIds);
         return toolExecutor.createShape(buildBooleanCode(boolType, shapeIds, name), "boolean");
     }
+
+    /**
+     * Combine plusieurs formes existantes en appliquant une opération booléenne
+     * et retourne l'UUID du résultat.
+     *
+     * <p>Ne pas fournir d'IDs factices : les UUIDs doivent être ceux retournés
+     * par les appels de création précédents. Requiert au moins deux shapes.</p>
+     *
+     * @param boolType type d'opération: "union", "subtract", "intersect", "exclude"
+     * @param shapeIds liste d'UUIDs séparés par des virgules (minimum 2)
+     * @param name nom optionnel du résultat
+     * @return l'UUID du shape résultant
+     */
     
 
     // ==================== CODE GENERATION METHODS ====================
@@ -213,6 +314,16 @@ public class PenpotShapeTools {
         return code.toString();
     }
 
+    /**
+     * Construit le code JavaScript exécuté par Penpot pour créer un rectangle.
+     *
+     * <p>Cette méthode assemble une chaîne JS qui initialise un rectangle,
+     * positionne et redimensionne l'élément, applique la couleur et le nom
+     * si fournis, puis retourne l'ID du shape.</p>
+     *
+     * @return code JS à exécuter par l'exécuteur de tools
+     */
+
     private String buildEllipseCode(Integer x, Integer y, Integer width, Integer height, String fillColor, String name) {
         StringBuilder code = new StringBuilder();
         code.append("const ellipse = penpot.createEllipse();\n");
@@ -227,6 +338,12 @@ public class PenpotShapeTools {
         return code.toString();
     }
 
+    /**
+     * Construit le code JavaScript pour créer une ellipse/cercle dans Penpot.
+     *
+     * @return code JS prêt à être passé à l'exécuteur
+     */
+
     private String buildBoardCode(Integer width, Integer height, String name, String backgroundColor) {
         StringBuilder code = new StringBuilder();
         code.append("const board = penpot.createBoard();\n");
@@ -238,6 +355,12 @@ public class PenpotShapeTools {
         code.append("return board.id;\n");
         return code.toString();
     }
+
+    /**
+     * Construit le code JavaScript pour créer un board (artboard/canvas).
+     *
+     * @return code JS qui crée et configure un board et retourne son UUID
+     */
 
     private String buildStarCode(
         Integer x, Integer y, Integer width, Integer height,
@@ -267,6 +390,15 @@ public class PenpotShapeTools {
         return code.toString();
     }
 
+    /**
+     * Génère le code JS pour créer une étoile à partir d'un SVG inline.
+     *
+     * <p>Calcule le path, génère le SVG et produit le JS qui crée le groupe
+     * correspondant dans Penpot puis positionne et nomme le groupe.</p>
+     *
+     * @return code JS qui crée l'étoile et retourne son UUID
+     */
+
     private String generateStarPath(int width, int height, int points, double innerRadiusRatio) {
         double cx = width / 2.0;
         double cy = height / 2.0;
@@ -288,6 +420,16 @@ public class PenpotShapeTools {
         sb.append(" Z");
         return sb.toString();
     }
+
+    /**
+     * Génère la chaîne 'd' pour le path d'une étoile SVG.
+     *
+     * @param width largeur du SVG
+     * @param height hauteur du SVG
+     * @param points nombre de branches
+     * @param innerRadiusRatio ratio du rayon intérieur (0-1)
+     * @return la valeur du path 'd' utilisable dans un élément <path>
+     */
 
     private String buildTriangleCode(
             Integer x, Integer y, Integer width, Integer height,
@@ -317,6 +459,12 @@ public class PenpotShapeTools {
     }
 
     /**
+     * Construit le JS pour créer un triangle (SVG) selon le type demandé.
+     *
+     * @return code JS qui crée le triangle et retourne son UUID
+     */
+
+    /**
      * Génère le SVG path selon le type de triangle.
      *
      * equilateral 
@@ -339,6 +487,17 @@ public class PenpotShapeTools {
             String.format(Locale.US, "M %.1f,0 L %d,%d L 0,%d Z", cx, width, height, height);
     };
 }
+
+        /**
+         * Génère le chemin SVG pour un triangle selon le type demandé.
+         *
+         * <p>Supporte les types: "equilateral", "right", "isosceles".</p>
+         *
+         * @param width largeur souhaitée
+         * @param height hauteur souhaitée
+         * @param type type de triangle (peut être null -> "equilateral")
+         * @return la chaîne path SVG correspondante
+         */
 
      /**
      * Génère le JS pour une opération booléenne Penpot.
